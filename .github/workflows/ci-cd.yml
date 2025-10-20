@@ -396,7 +396,7 @@ jobs:
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
           subject: 'CI/CD Pipeline ${{ steps.status.outputs.status }}: ${{ github.repository }}'
-          to: data-team@telestream.com
+          to: geredi61@gmail.com
           from: GitHub Actions <noreply@github.com>
           body: |
             Pipeline Status: ${{ steps.status.outputs.status }}
