@@ -284,7 +284,6 @@ jobs:
         continue-on-error: true
 
       - name: Snyk scan
-        if: secrets.SNYK_TOKEN != ''
         uses: snyk/actions/python@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -379,7 +378,6 @@ jobs:
           fi
 
       - name: Slack Notification
-        if: secrets.SLACK_WEBHOOK_URL != ''
         uses: 8398a7/action-slack@v3
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -391,7 +389,6 @@ jobs:
         continue-on-error: true
 
       - name: Email Notification
-        if: secrets.EMAIL_USERNAME != '' && secrets.EMAIL_PASSWORD != ''
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
