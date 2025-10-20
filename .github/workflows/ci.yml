@@ -1,3 +1,62 @@
+# name: CI
+
+# on:
+#   push:
+#     branches: [ main, add-project-structure ]
+#   pull_request:
+#     branches: [ main ]
+
+# jobs:
+#   test:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Show repository root (debug)
+#         run: |
+#           echo "PWD: $(pwd)"
+#           ls -la
+
+#       - name: Set up Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: '3.10'
+#           cache: 'pip'
+#           # allow nested requirements/pyproject locations
+#           cache-dependency-path: |
+#             **/requirements.txt
+#             **/pyproject.toml
+
+#       - name: Install dependencies (robust)
+#         run: |
+#           python -m pip install --upgrade pip
+#           # Try repository root first
+#           if [ -f requirements.txt ]; then
+#             pip install -r requirements.txt
+#           else
+#             # Attempt to find a nested requirements.txt (depth 3)
+#             REQ=$(find . -maxdepth 3 -type f -name requirements.txt | head -n 1 || true)
+#             if [ -n "$REQ" ]; then
+#               echo "Found nested requirements at: $REQ"
+#               pip install -r "$REQ"
+#             elif [ -f pyproject.toml ]; then
+#               echo "Found pyproject.toml; installing editable package"
+#               pip install .
+#             else
+#               echo "No requirements.txt or pyproject.toml found. If you intentionally keep dependency files under a subdirectory, either move a requirements.txt to repo root or update cache-dependency-path / install steps."
+#               # Optional: fail the job so issues are visible early:
+#               exit 1
+#             fi
+#           fi
+
+#       - name: Run unit tests
+#         run: |
+#           pytest tests/unit -q
+
+
+
+
 name: CI
 
 on:
@@ -9,21 +68,23 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Show repository root (debug)
+      - name: Debug: show repo root
         run: |
-          echo "PWD: $(pwd)"
+          echo "Working directory: $(pwd)"
           ls -la
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: ${{ matrix.python-version }}
           cache: 'pip'
-          # allow nested requirements/pyproject locations
           cache-dependency-path: |
             **/requirements.txt
             **/pyproject.toml
@@ -31,25 +92,62 @@ jobs:
       - name: Install dependencies (robust)
         run: |
           python -m pip install --upgrade pip
-          # Try repository root first
+          # Prefer root requirements.txt
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           else
-            # Attempt to find a nested requirements.txt (depth 3)
+            # Find a nested requirements.txt (search depth 3)
             REQ=$(find . -maxdepth 3 -type f -name requirements.txt | head -n 1 || true)
             if [ -n "$REQ" ]; then
               echo "Found nested requirements at: $REQ"
               pip install -r "$REQ"
             elif [ -f pyproject.toml ]; then
-              echo "Found pyproject.toml; installing editable package"
+              echo "Found pyproject.toml; installing package"
               pip install .
             else
-              echo "No requirements.txt or pyproject.toml found. If you intentionally keep dependency files under a subdirectory, either move a requirements.txt to repo root or update cache-dependency-path / install steps."
-              # Optional: fail the job so issues are visible early:
+              echo "No requirements.txt or pyproject.toml found."
+              # Fail early so CI is explicit (remove exit 1 if you prefer a non-failing fallback)
               exit 1
             fi
           fi
 
+      - name: Prepare reports directory
+        run: mkdir -p reports
+
       - name: Run unit tests
         run: |
-          pytest tests/unit -q
+          pytest tests/unit -q --junitxml=reports/pytest-${{ matrix.python-version }}.xml
+        # let the job fail when tests fail (do not use continue-on-error)
+
+      - name: Upload test reports (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.python-version }}
+          path: reports/pytest-${{ matrix.python-version }}.xml
+
+  # Optional: a lightweight job to run linters / code quality separate from tests
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python for lint
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: |
+            **/requirements.txt
+            **/pyproject.toml
+
+      - name: Install lint deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff==0.12.1 || true
+
+      - name: Run ruff (code quality)
+        run: |
+          # Adjust/replace with flake8/black/mypy commands your repo uses
+          ruff check . || exit 1
