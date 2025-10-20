@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, add-project-structure ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show repository root (debug)
+        run: |
+          echo "PWD: $(pwd)"
+          ls -la
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          # allow nested requirements/pyproject locations
+          cache-dependency-path: |
+            **/requirements.txt
+            **/pyproject.toml
+
+      - name: Install dependencies (robust)
+        run: |
+          python -m pip install --upgrade pip
+          # Try repository root first
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            # Attempt to find a nested requirements.txt (depth 3)
+            REQ=$(find . -maxdepth 3 -type f -name requirements.txt | head -n 1 || true)
+            if [ -n "$REQ" ]; then
+              echo "Found nested requirements at: $REQ"
+              pip install -r "$REQ"
+            elif [ -f pyproject.toml ]; then
+              echo "Found pyproject.toml; installing editable package"
+              pip install .
+            else
+              echo "No requirements.txt or pyproject.toml found. If you intentionally keep dependency files under a subdirectory, either move a requirements.txt to repo root or update cache-dependency-path / install steps."
+              # Optional: fail the job so issues are visible early:
+              exit 1
+            fi
+          fi
+
+      - name: Run unit tests
+        run: |
+          pytest tests/unit -q
