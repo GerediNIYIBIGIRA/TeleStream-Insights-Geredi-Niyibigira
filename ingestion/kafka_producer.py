@@ -3,6 +3,7 @@ A minimal Kafka producer scaffold. Uses kafka-python if available. The producer 
 sample JSON lines from a file or generator and sends them to a topic. This is a template
 for how to implement streaming producers in the ingestion layer.
 """
+
 import json
 import time
 from typing import Iterable, Dict

@@ -1,6 +1,7 @@
 """
 Pydantic models for the FastAPI service.
 """
+
 from pydantic import BaseModel
 from typing import Optional
 

@@ -3,6 +3,7 @@ A simple batch ingestion script that reads CSV files from a directory, does basi
 and writes a combined parquet file to a staging area. This is intended as a scaffold and
 example of how batch ingestion can be implemented.
 """
+
 from pathlib import Path
 import argparse
 import pandas as pd
@@ -34,8 +35,12 @@ def ingest_csvs(input_dir: str, output_path: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Batch CSV ingestion to parquet staging")
-    parser.add_argument("--input-dir", required=True, help="Directory containing CSV files")
+    parser = argparse.ArgumentParser(
+        description="Batch CSV ingestion to parquet staging"
+    )
+    parser.add_argument(
+        "--input-dir", required=True, help="Directory containing CSV files"
+    )
     parser.add_argument("--output-path", required=True, help="Output parquet path")
     args = parser.parse_args()
     ingest_csvs(args.input_dir, args.output_path)
