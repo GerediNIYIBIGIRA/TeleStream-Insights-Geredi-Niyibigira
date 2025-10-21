@@ -1,9 +1,252 @@
+# # # version: '3.8'
+
+# # # services:
+# # #   # Message Broker
+# # #   kafka:
+# # #     image: confluentinc/cp-kafka:7.6.0
+# # #     environment:
+# # #       KAFKA_BROKER_ID: 1
+# # #       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+# # #       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+# # #       KAFKA_PROCESS_ROLES: broker,controller
+# # #       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+# # #       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+# # #       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+# # #       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+# # #       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+# # #       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+# # #       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+# # #       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+# # #     ports:
+# # #       - "9092:9092"
+# # #     volumes:
+# # #       - kafka_data:/var/lib/kafka/data
+
+# # #   # Schema Registry
+# # #   schema-registry:
+# # #     image: confluentinc/cp-schema-registry:7.6.0
+# # #     depends_on:
+# # #       - kafka
+# # #     environment:
+# # #       SCHEMA_REGISTRY_HOST_NAME: schema-registry
+# # #       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+# # #       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+# # #     ports:
+# # #       - "8081:8081"
+
+# # #   # PostgreSQL (Data Warehouse + Airflow metadata)
+# # #   postgres:
+# # #     image: postgres:16-alpine
+# # #     environment:
+# # #       POSTGRES_USER: telestream
+# # #       POSTGRES_PASSWORD: telestream123
+# # #       POSTGRES_DB: telestream_dw
+# # #     ports:
+# # #       - "5432:5432"
+# # #     volumes:
+# # #       - postgres_data:/var/lib/postgresql/data
+# # #       - ./init-scripts:/docker-entrypoint-initdb.d
+
+# # #   # Redis (Caching + Rate Limiting)
+# # #   redis:
+# # #     image: redis:7-alpine
+# # #     ports:
+# # #       - "6379:6379"
+# # #     volumes:
+# # #       - redis_data:/data
+
+# # #   # MinIO (S3-compatible Data Lake)
+# # #   minio:
+# # #     image: minio/minio:latest
+# # #     command: server /data --console-address ":9001"
+# # #     environment:
+# # #       MINIO_ROOT_USER: minioadmin
+# # #       MINIO_ROOT_PASSWORD: minioadmin123
+# # #     ports:
+# # #       - "9000:9000"
+# # #       - "9001:9001"
+# # #     volumes:
+# # #       - minio_data:/data
+
+# # #   # Apache Airflow
+# # #   airflow-webserver:
+# # #     build:
+# # #       context: ./airflow
+# # #       dockerfile: Dockerfile
+# # #     depends_on:
+# # #       - postgres
+# # #       - redis
+# # #     environment:
+# # #       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+# # #       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://telestream:telestream123@postgres/airflow
+# # #       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+# # #       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://telestream:telestream123@postgres/airflow
+# # #       AIRFLOW__CORE__FERNET_KEY: 'UKMzEm3yIuFYEq1y3-2FxPNWSVwRASpahmQ9kQfEr8E='
+# # #       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+# # #       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+# # #       AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+# # #       AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+# # #     volumes:
+# # #       - ./dags:/opt/airflow/dags
+# # #       - ./logs:/opt/airflow/logs
+# # #       - ./plugins:/opt/airflow/plugins
+# # #     ports:
+# # #       - "8080:8080"
+# # #     command: webserver
+
+# # #   airflow-scheduler:
+# # #     build:
+# # #       context: ./airflow
+# # #       dockerfile: Dockerfile
+# # #     depends_on:
+# # #       - postgres
+# # #       - redis
+# # #     environment:
+# # #       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+# # #       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://telestream:telestream123@postgres/airflow
+# # #       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+# # #       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://telestream:telestream123@postgres/airflow
+# # #       AIRFLOW__CORE__FERNET_KEY: 'UKMzEm3yIuFYEq1y3-2FxPNWSVwRASpahmQ9kQfEr8E='
+# # #     volumes:
+# # #       - ./dags:/opt/airflow/dags
+# # #       - ./logs:/opt/airflow/logs
+# # #       - ./plugins:/opt/airflow/plugins
+# # #     command: scheduler
+
+# # #   airflow-worker:
+# # #     build:
+# # #       context: ./airflow
+# # #       dockerfile: Dockerfile
+# # #     depends_on:
+# # #       - postgres
+# # #       - redis
+# # #     environment:
+# # #       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+# # #       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://telestream:telestream123@postgres/airflow
+# # #       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+# # #       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://telestream:telestream123@postgres/airflow
+# # #       AIRFLOW__CORE__FERNET_KEY: 'UKMzEm3yIuFYEq1y3-2FxPNWSVwRASpahmQ9kQfEr8E='
+# # #     volumes:
+# # #       - ./dags:/opt/airflow/dags
+# # #       - ./logs:/opt/airflow/logs
+# # #       - ./plugins:/opt/airflow/plugins
+# # #     command: celery worker
+
+# # #   # Metabase (Analytics Dashboard)
+# # #   metabase:
+# # #     image: metabase/metabase:latest
+# # #     depends_on:
+# # #       - postgres
+# # #     environment:
+# # #       MB_DB_TYPE: postgres
+# # #       MB_DB_DBNAME: metabase
+# # #       MB_DB_PORT: 5432
+# # #       MB_DB_USER: telestream
+# # #       MB_DB_PASS: telestream123
+# # #       MB_DB_HOST: postgres
+# # #     ports:
+# # #       - "3000:3000"
+
+# # #   # Prometheus (Metrics)
+# # #   prometheus:
+# # #     image: prom/prometheus:latest
+# # #     volumes:
+# # #       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+# # #       - prometheus_data:/prometheus
+# # #     ports:
+# # #       - "9090:9090"
+# # #     command:
+# # #       - '--config.file=/etc/prometheus/prometheus.yml'
+# # #       - '--storage.tsdb.path=/prometheus'
+
+# # #   # Grafana (Visualization)
+# # #   grafana:
+# # #     image: grafana/grafana:latest
+# # #     depends_on:
+# # #       - prometheus
+# # #     environment:
+# # #       GF_SECURITY_ADMIN_PASSWORD: admin123
+# # #       GF_INSTALL_PLUGINS: grafana-piechart-panel
+# # #     ports:
+# # #       - "3001:3000"
+# # #     volumes:
+# # #       - grafana_data:/var/lib/grafana
+
+# # # volumes:
+# # #   kafka_data:
+# # #   postgres_data:
+# # #   redis_data:
+# # #   minio_data:
+# # #   prometheus_data:
+# # #   grafana_data:
+
+# # # networks:
+# # #   default:
+# # #     name: telestream-network
+
+
+# # version: '3.8'
+
+# # x-build-args: &build-args
+# #   DOCKER_BUILDKIT: 0
+
+# # services:
+# #   api:
+# #     build:
+# #       context: .
+# #       dockerfile: Dockerfile
+
+
 # # version: '3.8'
 
 # # services:
+# #   # ============================================
+# #   # API SERVICE (FastAPI Application)
+# #   # ============================================
+# #   api:
+# #     build:
+# #       context: .
+# #       dockerfile: Dockerfile
+# #     container_name: telestream-api
+# #     depends_on:
+# #       - postgres
+# #       - redis
+# #       - kafka
+# #     environment:
+# #       # Database
+# #       DB_HOST: postgres
+# #       DB_PORT: 5432
+# #       DB_NAME: telestream_dw
+# #       DB_USER: telestream
+# #       DB_PASSWORD: telestream123
+# #       # Cache
+# #       REDIS_URL: redis://redis:6379
+# #       # Kafka
+# #       KAFKA_BROKERS: kafka:9092
+# #       # API
+# #       API_HOST: 0.0.0.0
+# #       API_PORT: 8000
+# #     ports:
+# #       - "8000:8000"
+# #     volumes:
+# #       - ./api:/app/api
+# #       - ./processing:/app/processing
+# #       - ./storage:/app/storage
+# #       - ./data:/app/data
+# #     restart: unless-stopped
+# #     networks:
+# #       - telestream-network
+# #     healthcheck:
+# #       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+# #       interval: 30s
+# #       timeout: 10s
+# #       retries: 3
+# #       start_period: 40s
+
 # #   # Message Broker
 # #   kafka:
 # #     image: confluentinc/cp-kafka:7.6.0
+# #     container_name: telestream-kafka
 # #     environment:
 # #       KAFKA_BROKER_ID: 1
 # #       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
@@ -21,10 +264,13 @@
 # #       - "9092:9092"
 # #     volumes:
 # #       - kafka_data:/var/lib/kafka/data
+# #     networks:
+# #       - telestream-network
 
 # #   # Schema Registry
 # #   schema-registry:
 # #     image: confluentinc/cp-schema-registry:7.6.0
+# #     container_name: telestream-schema-registry
 # #     depends_on:
 # #       - kafka
 # #     environment:
@@ -33,10 +279,13 @@
 # #       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
 # #     ports:
 # #       - "8081:8081"
+# #     networks:
+# #       - telestream-network
 
 # #   # PostgreSQL (Data Warehouse + Airflow metadata)
 # #   postgres:
 # #     image: postgres:16-alpine
+# #     container_name: telestream-postgres
 # #     environment:
 # #       POSTGRES_USER: telestream
 # #       POSTGRES_PASSWORD: telestream123
@@ -45,19 +294,35 @@
 # #       - "5432:5432"
 # #     volumes:
 # #       - postgres_data:/var/lib/postgresql/data
-# #       - ./init-scripts:/docker-entrypoint-initdb.d
+# #       - ./storage/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+# #     healthcheck:
+# #       test: ["CMD-SHELL", "pg_isready -U telestream"]
+# #       interval: 10s
+# #       timeout: 5s
+# #       retries: 5
+# #     networks:
+# #       - telestream-network
 
 # #   # Redis (Caching + Rate Limiting)
 # #   redis:
 # #     image: redis:7-alpine
+# #     container_name: telestream-redis
 # #     ports:
 # #       - "6379:6379"
 # #     volumes:
 # #       - redis_data:/data
+# #     healthcheck:
+# #       test: ["CMD", "redis-cli", "ping"]
+# #       interval: 10s
+# #       timeout: 3s
+# #       retries: 5
+# #     networks:
+# #       - telestream-network
 
 # #   # MinIO (S3-compatible Data Lake)
 # #   minio:
 # #     image: minio/minio:latest
+# #     container_name: telestream-minio
 # #     command: server /data --console-address ":9001"
 # #     environment:
 # #       MINIO_ROOT_USER: minioadmin
@@ -67,12 +332,15 @@
 # #       - "9001:9001"
 # #     volumes:
 # #       - minio_data:/data
+# #     networks:
+# #       - telestream-network
 
-# #   # Apache Airflow
+# #   # Apache Airflow Webserver
 # #   airflow-webserver:
 # #     build:
 # #       context: ./airflow
 # #       dockerfile: Dockerfile
+# #     container_name: telestream-airflow-webserver
 # #     depends_on:
 # #       - postgres
 # #       - redis
@@ -93,11 +361,15 @@
 # #     ports:
 # #       - "8080:8080"
 # #     command: webserver
+# #     networks:
+# #       - telestream-network
 
+# #   # Apache Airflow Scheduler
 # #   airflow-scheduler:
 # #     build:
 # #       context: ./airflow
 # #       dockerfile: Dockerfile
+# #     container_name: telestream-airflow-scheduler
 # #     depends_on:
 # #       - postgres
 # #       - redis
@@ -112,11 +384,15 @@
 # #       - ./logs:/opt/airflow/logs
 # #       - ./plugins:/opt/airflow/plugins
 # #     command: scheduler
+# #     networks:
+# #       - telestream-network
 
+# #   # Apache Airflow Worker
 # #   airflow-worker:
 # #     build:
 # #       context: ./airflow
 # #       dockerfile: Dockerfile
+# #     container_name: telestream-airflow-worker
 # #     depends_on:
 # #       - postgres
 # #       - redis
@@ -131,10 +407,13 @@
 # #       - ./logs:/opt/airflow/logs
 # #       - ./plugins:/opt/airflow/plugins
 # #     command: celery worker
+# #     networks:
+# #       - telestream-network
 
 # #   # Metabase (Analytics Dashboard)
 # #   metabase:
 # #     image: metabase/metabase:latest
+# #     container_name: telestream-metabase
 # #     depends_on:
 # #       - postgres
 # #     environment:
@@ -146,10 +425,13 @@
 # #       MB_DB_HOST: postgres
 # #     ports:
 # #       - "3000:3000"
+# #     networks:
+# #       - telestream-network
 
 # #   # Prometheus (Metrics)
 # #   prometheus:
 # #     image: prom/prometheus:latest
+# #     container_name: telestream-prometheus
 # #     volumes:
 # #       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
 # #       - prometheus_data:/prometheus
@@ -158,10 +440,13 @@
 # #     command:
 # #       - '--config.file=/etc/prometheus/prometheus.yml'
 # #       - '--storage.tsdb.path=/prometheus'
+# #     networks:
+# #       - telestream-network
 
 # #   # Grafana (Visualization)
 # #   grafana:
 # #     image: grafana/grafana:latest
+# #     container_name: telestream-grafana
 # #     depends_on:
 # #       - prometheus
 # #     environment:
@@ -171,6 +456,8 @@
 # #       - "3001:3000"
 # #     volumes:
 # #       - grafana_data:/var/lib/grafana
+# #     networks:
+# #       - telestream-network
 
 # # volumes:
 # #   kafka_data:
@@ -181,67 +468,54 @@
 # #   grafana_data:
 
 # # networks:
-# #   default:
-# #     name: telestream-network
+# #   telestream-network:
+# #     driver: bridge
 
-
-# version: '3.8'
-
-# x-build-args: &build-args
-#   DOCKER_BUILDKIT: 0
-
-# services:
-#   api:
-#     build:
-#       context: .
-#       dockerfile: Dockerfile
 
 
 # version: '3.8'
 
 # services:
 #   # ============================================
-#   # API SERVICE (FastAPI Application)
+#   # API SERVICE - No build required!
 #   # ============================================
 #   api:
-#     build:
-#       context: .
-#       dockerfile: Dockerfile
+#     image: python:3.10-slim
 #     container_name: telestream-api
+#     working_dir: /app
 #     depends_on:
 #       - postgres
 #       - redis
-#       - kafka
 #     environment:
-#       # Database
 #       DB_HOST: postgres
 #       DB_PORT: 5432
 #       DB_NAME: telestream_dw
 #       DB_USER: telestream
 #       DB_PASSWORD: telestream123
-#       # Cache
 #       REDIS_URL: redis://redis:6379
-#       # Kafka
 #       KAFKA_BROKERS: kafka:9092
-#       # API
-#       API_HOST: 0.0.0.0
-#       API_PORT: 8000
 #     ports:
 #       - "8000:8000"
 #     volumes:
-#       - ./api:/app/api
-#       - ./processing:/app/processing
-#       - ./storage:/app/storage
-#       - ./data:/app/data
-#     restart: unless-stopped
+#       - .:/app
+#     command: >
+#       bash -c "
+#         echo '🚀 Installing dependencies...' &&
+#         pip install --quiet --no-cache-dir \
+#           fastapi==0.104.1 \
+#           uvicorn[standard]==0.24.0 \
+#           asyncpg==0.29.0 \
+#           redis==5.0.1 \
+#           pydantic==2.5.0 \
+#           python-jose[cryptography]==3.3.0 \
+#           passlib[bcrypt]==1.7.4 \
+#           pydantic-settings==2.1.0 &&
+#         echo '✅ Starting API server...' &&
+#         uvicorn api.fastapi_server:app --host 0.0.0.0 --port 8000 --reload
+#       "
 #     networks:
 #       - telestream-network
-#     healthcheck:
-#       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-#       interval: 30s
-#       timeout: 10s
-#       retries: 3
-#       start_period: 40s
+#     restart: unless-stopped
 
 #   # Message Broker
 #   kafka:
@@ -267,22 +541,7 @@
 #     networks:
 #       - telestream-network
 
-#   # Schema Registry
-#   schema-registry:
-#     image: confluentinc/cp-schema-registry:7.6.0
-#     container_name: telestream-schema-registry
-#     depends_on:
-#       - kafka
-#     environment:
-#       SCHEMA_REGISTRY_HOST_NAME: schema-registry
-#       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
-#       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-#     ports:
-#       - "8081:8081"
-#     networks:
-#       - telestream-network
-
-#   # PostgreSQL (Data Warehouse + Airflow metadata)
+#   # PostgreSQL
 #   postgres:
 #     image: postgres:16-alpine
 #     container_name: telestream-postgres
@@ -294,7 +553,7 @@
 #       - "5432:5432"
 #     volumes:
 #       - postgres_data:/var/lib/postgresql/data
-#       - ./storage/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+#       - ./storage/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
 #     healthcheck:
 #       test: ["CMD-SHELL", "pg_isready -U telestream"]
 #       interval: 10s
@@ -303,7 +562,7 @@
 #     networks:
 #       - telestream-network
 
-#   # Redis (Caching + Rate Limiting)
+#   # Redis
 #   redis:
 #     image: redis:7-alpine
 #     container_name: telestream-redis
@@ -319,7 +578,7 @@
 #     networks:
 #       - telestream-network
 
-#   # MinIO (S3-compatible Data Lake)
+#   # MinIO
 #   minio:
 #     image: minio/minio:latest
 #     container_name: telestream-minio
@@ -335,82 +594,7 @@
 #     networks:
 #       - telestream-network
 
-#   # Apache Airflow Webserver
-#   airflow-webserver:
-#     build:
-#       context: ./airflow
-#       dockerfile: Dockerfile
-#     container_name: telestream-airflow-webserver
-#     depends_on:
-#       - postgres
-#       - redis
-#     environment:
-#       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-#       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://telestream:telestream123@postgres/airflow
-#       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-#       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://telestream:telestream123@postgres/airflow
-#       AIRFLOW__CORE__FERNET_KEY: 'UKMzEm3yIuFYEq1y3-2FxPNWSVwRASpahmQ9kQfEr8E='
-#       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-#       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-#       AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
-#       AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-#     volumes:
-#       - ./dags:/opt/airflow/dags
-#       - ./logs:/opt/airflow/logs
-#       - ./plugins:/opt/airflow/plugins
-#     ports:
-#       - "8080:8080"
-#     command: webserver
-#     networks:
-#       - telestream-network
-
-#   # Apache Airflow Scheduler
-#   airflow-scheduler:
-#     build:
-#       context: ./airflow
-#       dockerfile: Dockerfile
-#     container_name: telestream-airflow-scheduler
-#     depends_on:
-#       - postgres
-#       - redis
-#     environment:
-#       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-#       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://telestream:telestream123@postgres/airflow
-#       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-#       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://telestream:telestream123@postgres/airflow
-#       AIRFLOW__CORE__FERNET_KEY: 'UKMzEm3yIuFYEq1y3-2FxPNWSVwRASpahmQ9kQfEr8E='
-#     volumes:
-#       - ./dags:/opt/airflow/dags
-#       - ./logs:/opt/airflow/logs
-#       - ./plugins:/opt/airflow/plugins
-#     command: scheduler
-#     networks:
-#       - telestream-network
-
-#   # Apache Airflow Worker
-#   airflow-worker:
-#     build:
-#       context: ./airflow
-#       dockerfile: Dockerfile
-#     container_name: telestream-airflow-worker
-#     depends_on:
-#       - postgres
-#       - redis
-#     environment:
-#       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-#       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://telestream:telestream123@postgres/airflow
-#       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-#       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://telestream:telestream123@postgres/airflow
-#       AIRFLOW__CORE__FERNET_KEY: 'UKMzEm3yIuFYEq1y3-2FxPNWSVwRASpahmQ9kQfEr8E='
-#     volumes:
-#       - ./dags:/opt/airflow/dags
-#       - ./logs:/opt/airflow/logs
-#       - ./plugins:/opt/airflow/plugins
-#     command: celery worker
-#     networks:
-#       - telestream-network
-
-#   # Metabase (Analytics Dashboard)
+#   # Metabase
 #   metabase:
 #     image: metabase/metabase:latest
 #     container_name: telestream-metabase
@@ -428,44 +612,11 @@
 #     networks:
 #       - telestream-network
 
-#   # Prometheus (Metrics)
-#   prometheus:
-#     image: prom/prometheus:latest
-#     container_name: telestream-prometheus
-#     volumes:
-#       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-#       - prometheus_data:/prometheus
-#     ports:
-#       - "9090:9090"
-#     command:
-#       - '--config.file=/etc/prometheus/prometheus.yml'
-#       - '--storage.tsdb.path=/prometheus'
-#     networks:
-#       - telestream-network
-
-#   # Grafana (Visualization)
-#   grafana:
-#     image: grafana/grafana:latest
-#     container_name: telestream-grafana
-#     depends_on:
-#       - prometheus
-#     environment:
-#       GF_SECURITY_ADMIN_PASSWORD: admin123
-#       GF_INSTALL_PLUGINS: grafana-piechart-panel
-#     ports:
-#       - "3001:3000"
-#     volumes:
-#       - grafana_data:/var/lib/grafana
-#     networks:
-#       - telestream-network
-
 # volumes:
 #   kafka_data:
 #   postgres_data:
 #   redis_data:
 #   minio_data:
-#   prometheus_data:
-#   grafana_data:
 
 # networks:
 #   telestream-network:
@@ -473,51 +624,64 @@
 
 
 
+
+
 version: '3.8'
 
 services:
   # ============================================
-  # API SERVICE - No build required!
+  # FASTAPI SERVICE (Main API Application)
   # ============================================
   api:
-    image: python:3.10-slim
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: telestream-api
-    working_dir: /app
     depends_on:
       - postgres
       - redis
+      - kafka
     environment:
+      # Database
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: telestream_dw
       DB_USER: telestream
       DB_PASSWORD: telestream123
+      # Cache
       REDIS_URL: redis://redis:6379
+      # Kafka
       KAFKA_BROKERS: kafka:9092
+      # API
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
+      - ./api:/app/api
+      - ./processing:/app/processing
+      - ./storage:/app/storage
+      - ./data:/app/data
     command: >
       bash -c "
         echo '🚀 Installing dependencies...' &&
-        pip install --quiet --no-cache-dir \
-          fastapi==0.104.1 \
-          uvicorn[standard]==0.24.0 \
-          asyncpg==0.29.0 \
-          redis==5.0.1 \
-          pydantic==2.5.0 \
-          python-jose[cryptography]==3.3.0 \
-          passlib[bcrypt]==1.7.4 \
-          pydantic-settings==2.1.0 &&
-        echo '✅ Starting API server...' &&
+        pip install --no-cache-dir -r requirements.txt &&
+        echo '✅ Starting FastAPI Server...' &&
         uvicorn api.fastapi_server:app --host 0.0.0.0 --port 8000 --reload
       "
+    restart: unless-stopped
     networks:
       - telestream-network
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
-  # Message Broker
+  # ============================================
+  # MESSAGE BROKER - Kafka
+  # ============================================
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     container_name: telestream-kafka
@@ -541,7 +705,9 @@ services:
     networks:
       - telestream-network
 
-  # PostgreSQL
+  # ============================================
+  # POSTGRES DATABASE
+  # ============================================
   postgres:
     image: postgres:16-alpine
     container_name: telestream-postgres
@@ -562,7 +728,9 @@ services:
     networks:
       - telestream-network
 
-  # Redis
+  # ============================================
+  # REDIS CACHE
+  # ============================================
   redis:
     image: redis:7-alpine
     container_name: telestream-redis
@@ -578,7 +746,9 @@ services:
     networks:
       - telestream-network
 
-  # MinIO
+  # ============================================
+  # MINIO STORAGE
+  # ============================================
   minio:
     image: minio/minio:latest
     container_name: telestream-minio
@@ -594,7 +764,9 @@ services:
     networks:
       - telestream-network
 
-  # Metabase
+  # ============================================
+  # METABASE (Dashboard)
+  # ============================================
   metabase:
     image: metabase/metabase:latest
     container_name: telestream-metabase
